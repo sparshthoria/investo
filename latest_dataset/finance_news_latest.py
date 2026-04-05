@@ -1,27 +1,5 @@
-"""
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  FINANCE NEWS DATASET BUILDER — 10,000 ROWS  (2018 → 2026)                 ║
-║  Python 3.9 Compatible | Fast (~10-15 min) | Reliable                      ║
-║                                                                             ║
-║  COLUMNS: Content | Summary | Sentiment | published_date                   ║
-║                                                                             ║
-║  DATA SOURCES:                                                              ║
-║   1. HuggingFace Finance Datasets  — bulk pre-collected news (~15k rows)   ║
-║   2. Wikipedia Finance Articles    — 130+ key economic topics              ║
-║   3. Parallel RSS Feeds            — latest 2024-2026 news (8 threads)     ║
-║                                                                             ║
-║  YEAR DISTRIBUTION: 40% >= 2024 | 60% 2018-2023                            ║
-║                                                                             ║
-║  HOW TO RUN:                                                                ║
-║    pip install requests beautifulsoup4 feedparser pandas                   ║
-║               vaderSentiment tqdm datasets                                  ║
-║    python finance_news_latest.py                                            ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-"""
-
-# ─────────────────────────────────────────────────────────────────────────────
 #  AUTO-INSTALL (uses same Python that runs this script — fixes pip mismatch)
-# ─────────────────────────────────────────────────────────────────────────────
+
 import subprocess, sys, importlib
 
 REQUIRED = {
@@ -52,9 +30,8 @@ for mod, pkg in REQUIRED.items():
 
 print("\n  All packages ready.\n")
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  IMPORTS
-# ─────────────────────────────────────────────────────────────────────────────
+
 import os, re, time, logging, platform, warnings
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict
@@ -70,15 +47,14 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 # Suppress noisy HuggingFace + other warnings
 warnings.filterwarnings("ignore")
-logging.disable(logging.WARNING)   # silence all low-level logging
+logging.disable(logging.WARNING)   
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  CONFIG
-# ─────────────────────────────────────────────────────────────────────────────
+
 TARGET_ROWS  = 10_000
 OUTPUT_FILE  = "finance_news_dataset.csv"
-LATEST_RATIO = 0.40          # 40% from 2024+, 60% from 2018-2023
-RSS_TIMEOUT  = 8             # seconds (fast feeds only)
+LATEST_RATIO = 0.40          
+RSS_TIMEOUT  = 8             
 HTTP_TIMEOUT = 12
 NOW          = datetime.now(timezone.utc)
 
@@ -92,9 +68,8 @@ HEADERS = {
 
 analyzer = SentimentIntensityAnalyzer()
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  CORE UTILITIES
-# ─────────────────────────────────────────────────────────────────────────────
+
 def get_sentiment(text: str) -> str:
     if not text:
         return "Neutral"
@@ -120,7 +95,7 @@ def parse_date(raw) -> Optional[datetime]:
     if isinstance(raw, datetime):
         return raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
     raw = str(raw).strip()
-    # GDELT-style: 20220115T120035Z
+
     if len(raw) >= 15 and "T" in raw[:9]:
         try:
             dt = datetime.strptime(raw[:15], "%Y%m%dT%H%M%S")
@@ -165,7 +140,7 @@ def strip_html(raw: str) -> str:
     return re.sub(r"\s+", " ",
                   BeautifulSoup(raw or "", "html.parser").get_text(" ")).strip()
 
-# ── De-duplication ────────────────────────────────────────────────────────────
+# De-duplication 
 _seen: set = set()
 
 def add(records: List[Dict], content: str,
@@ -182,7 +157,6 @@ def add(records: List[Dict], content: str,
     return True
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  SOURCE 1 — HUGGINGFACE DATASETS
 #  Datasets confirmed working (no trust_remote_code needed, no login needed):
 #    A) zeroshot/twitter-financial-news-sentiment  ~7,500 rows (2020-2022)
@@ -191,14 +165,14 @@ def add(records: List[Dict], content: str,
 #    D) TheFinAI/flare-finqa                       Q&A finance (2020-2023)
 #    E) takala/financial_phrasebank                sentences (2007-2019)
 #    F) sujet-finance/finance-all                  if available
-# ─────────────────────────────────────────────────────────────────────────────
+
 def load_hf() -> List[Dict]:
     print("\n▌ Source 1 — HuggingFace Finance Datasets …")
     recs: List[Dict] = []
 
     try:
         from datasets import load_dataset, disable_progress_bar
-        disable_progress_bar()   # disable per-shard progress bars
+        disable_progress_bar()   
     except ImportError:
         print("  ✘ datasets not available")
         return recs
@@ -382,9 +356,8 @@ def load_hf() -> List[Dict]:
     return recs
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  SOURCE 2 — WIKIPEDIA FINANCE TOPICS (rich historical context)
-# ─────────────────────────────────────────────────────────────────────────────
+
 WIKI = [
     # ── Market Events ─────────────────────────────────────────────────────────
     ("2020 stock market crash",            "2020-03-20"),
@@ -563,9 +536,8 @@ def load_wikipedia() -> List[Dict]:
     return recs
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  SOURCE 3 — PARALLEL RSS FEEDS (latest news 2024–2026)
-# ─────────────────────────────────────────────────────────────────────────────
+
 RSS_FEEDS = {
     # Indian (reliable, low-latency)
     "ET Markets":        "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
@@ -620,7 +592,7 @@ def _fetch_one_rss(name: str, url: str) -> List[Dict]:
             raw = entry.get("published") or entry.get("updated") or ""
             dt  = parse_date(raw)
             if dt and dt.year < 2022:
-                continue          # RSS only has recent items anyway
+                continue          
             if dt is None:
                 dt = NOW
             cblocks = entry.get("content", [])
@@ -666,9 +638,8 @@ def load_rss() -> List[Dict]:
     return all_recs
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  NLP + FINAL BUILD
-# ─────────────────────────────────────────────────────────────────────────────
+
 def apply_nlp(records: List[Dict]) -> pd.DataFrame:
     print(f"\n▌ NLP — Summary & Sentiment ({len(records):,} records) …")
     rows = []
@@ -755,9 +726,8 @@ def auto_open(path: str):
         pass
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  MAIN
-# ─────────────────────────────────────────────────────────────────────────────
+
 def run() -> pd.DataFrame:
     t0  = time.time()
     SEP = "═" * 68

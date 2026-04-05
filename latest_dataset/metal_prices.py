@@ -1,22 +1,3 @@
-"""
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  LATEST METAL & INDEX PRICES — Day-to-Day Dataset                          ║
-║  Output : latest_metal_prices.csv                                           ║
-║                                                                             ║
-║  COLUMNS:                                                                   ║
-║    Date | Gold Price (INR / 10gms) | Silver Price (INR / 1kg)             ║
-║    Price_Nifty | Price_Sensex                                               ║
-║                                                                             ║
-║  SOURCES (via yfinance):                                                    ║
-║    Gold   → GC=F  (USD/troy oz)  × USD/INR × (10g / 31.1035g)            ║
-║    Silver → SI=F  (USD/troy oz)  × USD/INR × (1000g / 31.1035g)          ║
-║    Nifty  → ^NSEI  (direct INR)                                            ║
-║    Sensex → ^BSESN (direct INR)                                            ║
-║                                                                             ║
-║  NOTE: Uses actual USD→INR conversion rates per day (USDINR=X)            ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-"""
-
 import subprocess, sys, importlib
 
 # ── Auto-install ──────────────────────────────────────────────────────────────
@@ -135,8 +116,8 @@ print(f"  Combined date range : {merged.index[0].date()}  →  {merged.index[-1]
 print(f"  Total rows          : {len(merged):,}")
 
 # ── Step 3: Handle missing USD/INR ───────────────────────────────────────────
-# If USDINR fetch failed, use a static fallback rate
-FALLBACK_USDINR = 84.5   # approximate as of early 2026
+
+FALLBACK_USDINR = 84.5   
 
 if raw.get("USDINR") is None or merged["USDINR"].isna().all():
     print(f"\n  ⚠  USD/INR data unavailable — using static rate ₹{FALLBACK_USDINR}")
