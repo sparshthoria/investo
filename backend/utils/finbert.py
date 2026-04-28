@@ -1,45 +1,39 @@
-# backend/utils/finbert.py
-import torch
-import numpy as np
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import logging
+import torch
+import torch.nn.functional as F
 
-logger = logging.getLogger("backend")
+MODEL_NAME = "yiyanghkust/finbert-tone"
 
-# Load model & tokenizer globally (lazy load)
-_MODEL = None
-_TOKENIZER = None
-_MODEL_NAME = "yiyanghkust/finbert-tone"
+print("Loading FinBERT model...")
+tokenizer  = AutoTokenizer.from_pretrained(MODEL_NAME)
+model      = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+model.eval()
+print("✅ FinBERT loaded")
 
-def _ensure_model():
-    global _MODEL, _TOKENIZER
-    if _MODEL is None or _TOKENIZER is None:
-        logger.info(f"Loading FinBERT model {_MODEL_NAME} (this may take a while)...")
-        _TOKENIZER = AutoTokenizer.from_pretrained(_MODEL_NAME)
-        _MODEL = AutoModelForSequenceClassification.from_pretrained(_MODEL_NAME)
-        _MODEL.eval()
-        # put to cpu (we won't assume GPU on deployment)
-        _MODEL.to("cpu")
-        logger.info("FinBERT loaded.")
 
-def compute_finbert_impact(text: str) -> float:
+def get_impact_score(text: str) -> float:
     """
-    Returns impact score in [-1,1] rounded to 2 decimals.
-    Uses (pos_prob - neg_prob) as signed score.
+    Returns a sentiment impact score between -1.0 and +1.0.
+    Score = P(positive) - P(negative)
     """
-    if not isinstance(text, str) or text.strip() == "":
-        return 0.0
-    _ensure_model()
-    inputs = _TOKENIZER(text, return_tensors="pt", truncation=True, padding=True, max_length=256)
+    inputs = tokenizer(
+        text,
+        return_tensors="pt",
+        truncation=True,
+        padding=True,
+        max_length=128
+    )
     with torch.no_grad():
-        outputs = _MODEL(**inputs)
-        logits = outputs.logits
-        probs = torch.softmax(logits, dim=-1).squeeze().cpu().numpy()
-        # model label order: [negative, neutral, positive] typically
-        neg = float(probs[0])
-        pos = float(probs[2])
-        score = pos - neg
-        # clamp and round
-        score = max(-1.0, min(1.0, score))
-        score = float(np.round(score, 2))
-    return score
+        probs = F.softmax(model(**inputs).logits, dim=-1)
+
+    score = probs[0, 2].item() - probs[0, 0].item()
+    return round(score, 4)
+
+
+def get_sentiment_label(score: float) -> str:
+    if score > 0.05:
+        return "Positive"
+    elif score < -0.05:
+        return "Negative"
+    else:
+        return "Neutral"

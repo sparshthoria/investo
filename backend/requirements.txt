@@ -9,3 +9,5 @@ torch
 tqdm
 python-multipart
 xgboost
+lightgbm
+python-dotenv
